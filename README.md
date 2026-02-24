@@ -95,6 +95,8 @@ Create `~/.openclaw/workspace/adguard-instances.json`:
 
 ## Version
 
+**v1.2.0** - 🔒 Security Hardening (Fixed command injection, native HTTP client, input validation)
+
 **v1.1.1** - Support default and custom workspace paths
 
 ## Author
