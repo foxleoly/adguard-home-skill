@@ -14,9 +14,65 @@
 - ✅ Health status check | 健康状态检查
 - ✅ Service status monitoring | 服务状态监控
 - ✅ DNS configuration details | DNS 配置详情
-- ✅ Filter rules inspection | 过滤规则检查
+- ✅ Filter rules inspection | 过滤规则和列表
 - ✅ Recent query log | 最近查询日志
 - ✅ TLS/encryption status | TLS/加密状态
+
+---
+
+## Installation | 安装方法
+
+### Method 1: ClawHub CLI (Recommended) | 方法 1: ClawHub CLI（推荐）
+
+```bash
+# Install from ClawHub registry | 从 ClawHub 安装
+clawhub install adguard-home
+
+# Verify installation | 验证安装
+clawhub list | grep adguard-home
+```
+
+### Method 2: Manual Install | 方法 2: 手动安装
+
+```bash
+# Clone the repository | 克隆仓库
+git clone https://github.com/foxleoly/adguard-home-skill.git
+cd adguard-home-skill
+
+# Copy to your skills directory | 复制到技能目录
+cp -r . ~/.openclaw/workspace/skills/adguard-home/
+```
+
+### Post-Installation Setup | 安装后配置
+
+1. **Create configuration file | 创建配置文件:**
+   ```bash
+   # Edit adguard-instances.json | 编辑配置文件
+   vim ~/.openclaw/workspace/adguard-instances.json
+   ```
+
+2. **Add your instances | 添加实例:**
+   ```json
+   {
+     "instances": {
+       "dns1": {
+         "url": "http://192.168.1.1:80",
+         "username": "admin",
+         "password": "your-password"
+       }
+     }
+   }
+   ```
+
+3. **Secure the config file | 保护配置文件:**
+   ```bash
+   chmod 600 ~/.openclaw/workspace/adguard-instances.json
+   ```
+
+4. **Test the skill | 测试技能:**
+   ```bash
+   /adguard stats dns1
+   ```
 
 ---
 
