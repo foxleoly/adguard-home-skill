@@ -14,7 +14,8 @@
     "SKILL.md",
     "index.js",
     "README.md",
-    "SECURITY_AUDIT.md"
+    "SECURITY_AUDIT.md",
+    "TEST_REPORT.md"
   ],
   "requires": {
     "env": ["OPENCLAW_WORKSPACE (optional)", "HOME (standard)"],
