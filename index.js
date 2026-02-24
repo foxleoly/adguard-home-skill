@@ -1,17 +1,77 @@
 #!/usr/bin/env node
 
+/**
+ * AdGuard Home Skill - Secure Version
+ * 🛡️ Query AdGuard Home instances for DNS statistics and configuration
+ * 
+ * Security improvements:
+ * - Replaced execSync/curl with native HTTPS requests
+ * - Input validation and sanitization
+ * - No command injection vulnerabilities
+ * - Secure credential handling
+ */
+
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import https from 'https';
+import http from 'http';
+import { URL } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load instance configuration
-// Support both default (~/.openclaw/workspace/) and custom (~/.openclaw-*/workspace/) paths
+// ============ Security: Input Validation ============
+
+/**
+ * Validate and sanitize instance name (alphanumeric, dash, underscore only)
+ */
+function sanitizeInstanceName(name) {
+  if (!name || typeof name !== 'string') {
+    return null;
+  }
+  const sanitized = name.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+  return sanitized.length > 0 && sanitized.length <= 50 ? sanitized : null;
+}
+
+/**
+ * Validate command against whitelist
+ */
+const ALLOWED_COMMANDS = new Set([
+  'stats', 'top-clients', 'top-blocked', 'health', 
+  'status', 'dns-info', 'filter-rules', 'querylog', 
+  'clients', 'tls-status'
+]);
+
+function validateCommand(cmd) {
+  return cmd && ALLOWED_COMMANDS.has(cmd) ? cmd : null;
+}
+
+/**
+ * Validate integer with range
+ */
+function validateInt(value, min = 1, max = 100, defaultValue = 10) {
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) return defaultValue;
+  return Math.max(min, Math.min(max, parsed));
+}
+
+/**
+ * Validate URL format
+ */
+function validateUrl(urlStr) {
+  try {
+    const parsed = new URL(urlStr);
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && parsed.hostname;
+  } catch {
+    return false;
+  }
+}
+
+// ============ Configuration Loading ============
+
 function findConfigPath() {
-  // Priority 1: Environment variable OPENCLAW_WORKSPACE
+  // Priority 1: Environment variable
   if (process.env.OPENCLAW_WORKSPACE) {
     const envPath = path.join(process.env.OPENCLAW_WORKSPACE, 'adguard-instances.json');
     if (fs.existsSync(envPath)) {
@@ -19,13 +79,13 @@ function findConfigPath() {
     }
   }
   
-  // Priority 2: Default OpenClaw workspace (~/.openclaw/workspace/)
+  // Priority 2: Default OpenClaw workspace
   const defaultPath = path.join(process.env.HOME, '.openclaw', 'workspace', 'adguard-instances.json');
   if (fs.existsSync(defaultPath)) {
     return defaultPath;
   }
   
-  // Priority 3: Custom OpenClaw workspace (~/.openclaw-*/workspace/)
+  // Priority 3: Custom OpenClaw workspace
   const homeDir = process.env.HOME;
   try {
     const dirs = fs.readdirSync(homeDir);
@@ -38,10 +98,9 @@ function findConfigPath() {
       }
     }
   } catch (e) {
-    // Ignore readdir errors
+    // Ignore
   }
   
-  // Not found
   return null;
 }
 
@@ -53,223 +112,303 @@ if (configPath && fs.existsSync(configPath)) {
     const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     instances = config.instances || {};
   } catch (e) {
-    console.error('Error loading AdGuard instances config:', e.message);
+    console.error('❌ Error loading AdGuard instances config:', e.message);
     process.exit(1);
   }
 }
 
-// Get command and instance from arguments
-const args = process.argv.slice(2);
-const command = args[0] || 'stats';
-let instanceName = args[1];
+// ============ HTTP Client (Secure, No execSync) ============
 
-// If no instance specified and only one exists, use it
-if (!instanceName && Object.keys(instances).length === 1) {
-  instanceName = Object.keys(instances)[0];
-}
-
-// Validate instance
-if (!instanceName || !instances[instanceName]) {
-  if (Object.keys(instances).length === 0) {
-    console.error('No AdGuard instances configured.');
-    console.error('Please create adguard-instances.json in one of these locations:');
-    console.error('  1. $OPENCLAW_WORKSPACE/adguard-instances.json (if OPENCLAW_WORKSPACE is set)');
-    console.error('  2. ~/.openclaw/workspace/adguard-instances.json (default)');
-    console.error('  3. ~/.openclaw-*/workspace/adguard-instances.json (custom workspace)');
-    console.error('\nExample configuration:');
-    console.error('{');
-    console.error('  "instances": {');
-    console.error('    "dns1": {');
-    console.error('      "url": "http://192.168.1.1:80",');
-    console.error('      "username": "admin",');
-    console.error('      "password": "your-password"');
-    console.error('    }');
-    console.error('  }');
-    console.error('}');
-  } else {
-    console.error('Available instances:', Object.keys(instances).join(', '));
-  }
-  process.exit(1);
-}
-
-const instance = instances[instanceName];
-const { url, username, password } = instance;
-
-// Create temp cookie file
-const cookieFile = `/tmp/adguard_${instanceName}_cookie.txt`;
-
-// Helper function to make authenticated API calls
-function apiCall(endpoint) {
-  execSync(`curl -s -X POST ${url}/control/login -H "Content-Type: application/json" -d '{"name":"${username}","password":"${password}"}' -c ${cookieFile}`, { stdio: 'ignore' });
-  return execSync(`curl -s -b ${cookieFile} ${url}${endpoint}`, { encoding: 'utf8' });
-}
-
-try {
-  let data;
-  switch (command) {
-    case 'stats':
-      data = apiCall('/control/stats');
-      const stats = JSON.parse(data);
-      console.log(`📊 AdGuard Home Statistics (${instanceName})`);
-      console.log(`Total DNS Queries: ${stats.num_dns_queries.toLocaleString()}`);
-      console.log(`Blocked Requests: ${stats.num_blocked_filtering.toLocaleString()} (${((stats.num_blocked_filtering / stats.num_dns_queries) * 100).toFixed(1)}%)`);
-      console.log(`Avg Response Time: ${stats.avg_processing_time.toFixed(3)}ms`);
-      break;
-      
-    case 'top-clients':
-      data = apiCall('/control/stats');
-      const clientsData = JSON.parse(data);
-      const clients = {};
-      for (const item of clientsData.top_clients) {
-        const [ip, count] = Object.entries(item)[0];
-        clients[ip] = count;
+/**
+ * Make HTTP POST request with cookie handling
+ */
+function httpRequest(baseUrl, endpoint, method = 'GET', postData = null, cookie = null) {
+  return new Promise((resolve, reject) => {
+    const fullUrl = new URL(endpoint, baseUrl);
+    const protocol = fullUrl.protocol === 'https:' ? https : http;
+    
+    const options = {
+      hostname: fullUrl.hostname,
+      port: fullUrl.port || (fullUrl.protocol === 'https:' ? 443 : 80),
+      path: fullUrl.pathname + fullUrl.search,
+      method: method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
       }
-      console.log(`💻 Top Clients (${instanceName})`);
-      Object.entries(clients).slice(0, 10).forEach(([ip, count], i) => {
-        console.log(`${i + 1}. ${ip}: ${count.toLocaleString()} queries`);
-      });
-      break;
-      
-    case 'top-blocked':
-      data = apiCall('/control/stats');
-      const blockedData = JSON.parse(data);
-      const blocked = {};
-      for (const item of blockedData.top_blocked_domains) {
-        const [domain, count] = Object.entries(item)[0];
-        blocked[domain] = count;
+    };
+    
+    if (cookie) {
+      options.headers['Cookie'] = cookie;
+    }
+    
+    if (postData) {
+      options.headers['Content-Length'] = Buffer.byteLength(postData);
+    }
+    
+    const req = protocol.request(options, (res) => {
+      const cookies = res.headers['set-cookie'];
+      let cookieValue = null;
+      if (cookies) {
+        cookieValue = cookies.map(c => c.split(';')[0]).join('; ');
       }
-      console.log(`🚫 Top Blocked Domains (${instanceName})`);
-      Object.entries(blocked).slice(0, 10).forEach(([domain, count], i) => {
-        console.log(`${i + 1}. ${domain}: ${count.toLocaleString()} blocks`);
-      });
-      break;
       
-    case 'health':
-      const healthCode = execSync(`curl -s -o /dev/null -w "%{http_code}" ${url}`, { encoding: 'utf8' });
-      console.log(`✅ Health Check (${instanceName}): HTTP ${healthCode}`);
-      break;
-      
-    case 'status':
-      data = apiCall('/control/status');
-      const status = JSON.parse(data);
-      console.log(`🔧 AdGuard Home Status (${instanceName})`);
-      console.log(`Version: ${status.version}`);
-      console.log(`Running: ${status.running ? '✅ Yes' : '❌ No'}`);
-      console.log(`Protection: ${status.protection_enabled ? '✅ Enabled' : '❌ Disabled'}`);
-      console.log(`DNS Port: ${status.dns_port}`);
-      console.log(`HTTP Port: ${status.http_port}`);
-      console.log(`Language: ${status.language}`);
-      console.log(`DHCP Available: ${status.dhcp_available ? '✅ Yes' : '❌ No'}`);
-      break;
-      
-    case 'dns-info':
-      data = apiCall('/control/dns_info');
-      const dnsInfo = JSON.parse(data);
-      console.log(`🌐 DNS Configuration (${instanceName})`);
-      console.log(`Protection: ${dnsInfo.protection_enabled ? '✅ Enabled' : '❌ Disabled'}`);
-      console.log(`Rate Limit: ${dnsInfo.ratelimit} req/s`);
-      console.log(`Upstream Mode: ${dnsInfo.upstream_mode}`);
-      console.log(`Cache: ${dnsInfo.cache_enabled ? `✅ ${ (dnsInfo.cache_size / 1024 / 1024).toFixed(0) }MB` : '❌ Disabled'}`);
-      console.log(`DNSSEC: ${dnsInfo.dnssec_enabled ? '✅ Enabled' : '❌ Disabled'}`);
-      console.log(`IPv6: ${dnsInfo.disable_ipv6 ? '❌ Disabled' : '✅ Enabled'}`);
-      console.log(`\nUpstream DNS Servers:`);
-      dnsInfo.upstream_dns.forEach((dns, i) => {
-        console.log(`  ${i + 1}. ${dns}`);
-      });
-      break;
-      
-    case 'filter-rules':
-      data = apiCall('/control/filtering/status');
-      const filterStatus = JSON.parse(data);
-      console.log(`🛡️ Filter Rules (${instanceName})`);
-      console.log(`Filtering: ${filterStatus.enabled ? '✅ Enabled' : '❌ Disabled'}`);
-      console.log(`Update Interval: ${filterStatus.interval} hours`);
-      console.log(`User Rules: ${filterStatus.user_rules ? filterStatus.user_rules.length : 0} custom rules`);
-      console.log(`\nFilter Lists:`);
-      if (filterStatus.filters && filterStatus.filters.length > 0) {
-        filterStatus.filters.forEach((filter, i) => {
-          const status = filter.enabled ? '✅' : '❌';
-          console.log(`  ${i + 1}. ${status} ${filter.name} (${filter.rules_count} rules)`);
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        resolve({
+          statusCode: res.statusCode,
+          data: data,
+          cookie: cookieValue
         });
-      } else {
-        console.log('  No filter lists configured');
-      }
-      break;
-      
-    case 'querylog':
-      const limit = args[2] || '10';
-      data = apiCall(`/control/querylog?limit=${limit}&response_status="all"`);
-      const queryLog = JSON.parse(data);
-      console.log(`📜 Recent DNS Queries (${instanceName}) - Last ${limit} entries\n`);
-      if (queryLog.data && queryLog.data.length > 0) {
-        queryLog.data.forEach((entry, i) => {
-          const status = entry.reason.includes('Filtered') ? '🚫 BLOCKED' : '✅ OK';
-          const domain = entry.question.name;
-          const client = entry.client;
-          const time = new Date(entry.time).toLocaleTimeString();
-          console.log(`${i + 1}. [${time}] ${status} ${domain} (${client})`);
-          if (entry.rule) {
-            console.log(`   Rule: ${entry.rule}`);
-          }
-        });
-      } else {
-        console.log('No query log entries found');
-      }
-      break;
-      
-    case 'clients':
-      data = apiCall('/control/clients');
-      const clientsList = JSON.parse(data);
-      console.log(`👥 Clients (${instanceName})`);
-      if (clientsList.clients && clientsList.clients.length > 0) {
-        clientsList.clients.forEach((client, i) => {
-          console.log(`${i + 1}. ${client.name || client.ids[0] || 'Unknown'}`);
-          if (client.use_global_settings === false) {
-            console.log(`   Custom settings enabled`);
-          }
-          if (client.blocking_mode) {
-            console.log(`   Blocking mode: ${client.blocking_mode}`);
-          }
-        });
-      } else {
-        console.log('No manually configured clients');
-      }
-      console.log(`\nAuto-discovered clients: ${clientsList.auto_clients ? clientsList.auto_clients.length : 0}`);
-      break;
-      
-    case 'tls-status':
-      data = apiCall('/control/tls/status');
-      const tlsStatus = JSON.parse(data);
-      console.log(`🔒 TLS/Encryption Status (${instanceName})`);
-      console.log(`TLS Enabled: ${tlsStatus.enabled ? '✅ Yes' : '❌ No'}`);
-      console.log(`Force HTTPS: ${tlsStatus.force_https ? '✅ Yes' : '❌ No'}`);
-      console.log(`Valid Certificate: ${tlsStatus.valid_cert ? '✅ Yes' : '❌ No'}`);
-      console.log(`HTTPS Port: ${tlsStatus.port_https}`);
-      console.log(`DoT Port: ${tlsStatus.port_dns_over_tls}`);
-      console.log(`DoQ Port: ${tlsStatus.port_dns_over_quic}`);
-      console.log(`Allow Unencrypted DoH: ${tlsStatus.allow_unencrypted_doh ? '✅ Yes' : '❌ No'}`);
-      break;
-      
-    default:
-      console.error('Unknown command. Available commands:');
-      console.error('  stats          - DNS query and blocking statistics');
-      console.error('  top-clients    - Most active clients');
-      console.error('  top-blocked    - Most frequently blocked domains');
-      console.error('  health         - Instance health check');
-      console.error('  status         - Service status (version, protection, ports)');
-      console.error('  dns-info       - DNS configuration details');
-      console.error('  filter-rules   - Filter rules and lists');
-      console.error('  querylog [n]   - Recent DNS queries (default: 10)');
-      console.error('  clients        - Configured clients');
-      console.error('  tls-status     - TLS/encryption status');
-      process.exit(1);
+      });
+    });
+    
+    req.on('error', reject);
+    
+    if (postData) {
+      req.write(postData);
+    }
+    
+    req.end();
+  });
+}
+
+/**
+ * Authenticate and get session cookie
+ */
+async function authenticate(baseUrl, username, password) {
+  const response = await httpRequest(
+    baseUrl, 
+    '/control/login', 
+    'POST', 
+    JSON.stringify({ name: username, password: password })
+  );
+  
+  if (response.statusCode !== 200 || !response.cookie) {
+    throw new Error(`Authentication failed: HTTP ${response.statusCode}`);
   }
-} catch (e) {
-  console.error('Error querying AdGuard instance:', e.message);
-  process.exit(1);
-} finally {
-  // Clean up cookie file
-  if (fs.existsSync(cookieFile)) {
-    fs.unlinkSync(cookieFile);
+  
+  return response.cookie;
+}
+
+/**
+ * Make authenticated API call
+ */
+async function apiCall(baseUrl, cookie, endpoint) {
+  const response = await httpRequest(baseUrl, endpoint, 'GET', null, cookie);
+  
+  if (response.statusCode !== 200) {
+    throw new Error(`API call failed: HTTP ${response.statusCode}`);
+  }
+  
+  return JSON.parse(response.data);
+}
+
+// ============ Main Logic ============
+
+async function main() {
+  const args = process.argv.slice(2);
+  
+  // Security: Validate command
+  const command = validateCommand(args[0]) || 'stats';
+  
+  // Security: Sanitize instance name
+  let instanceName = sanitizeInstanceName(args[1]);
+  
+  // Auto-select if only one instance
+  if (!instanceName && Object.keys(instances).length === 1) {
+    instanceName = Object.keys(instances)[0];
+  }
+  
+  // Validate instance exists
+  if (!instanceName || !instances[instanceName]) {
+    if (Object.keys(instances).length === 0) {
+      console.error('❌ No AdGuard instances configured.');
+      console.error('📁 Create adguard-instances.json in one of:');
+      console.error('   1. $OPENCLAW_WORKSPACE/adguard-instances.json');
+      console.error('   2. ~/.openclaw/workspace/adguard-instances.json (default)');
+      console.error('   3. ~/.openclaw-*/workspace/adguard-instances.json');
+      console.error('\n📝 Example:');
+      console.error(JSON.stringify({
+        instances: {
+          dns1: {
+            url: 'http://192.168.1.1:80',
+            username: 'admin',
+            password: 'your-password'
+          }
+        }
+      }, null, 2));
+    } else {
+      console.error('❌ Instance not found:', instanceName || '(none specified)');
+      console.error('📋 Available:', Object.keys(instances).join(', '));
+    }
+    process.exit(1);
+  }
+  
+  const instance = instances[instanceName];
+  const { url, username, password } = instance;
+  
+  // Security: Validate URL
+  if (!validateUrl(url)) {
+    console.error('❌ Invalid URL format in instance configuration');
+    process.exit(1);
+  }
+  
+  try {
+    // Authenticate
+    const cookie = await authenticate(url, username, password);
+    
+    let data;
+    switch (command) {
+      case 'stats':
+        data = await apiCall(url, cookie, '/control/stats');
+        console.log(`📊 AdGuard Home Statistics (${instanceName})`);
+        console.log(`Total DNS Queries: ${data.num_dns_queries.toLocaleString()}`);
+        console.log(`Blocked Requests: ${data.num_blocked_filtering.toLocaleString()} (${((data.num_blocked_filtering / data.num_dns_queries) * 100).toFixed(1)}%)`);
+        console.log(`Avg Response Time: ${data.avg_processing_time.toFixed(3)}ms`);
+        break;
+        
+      case 'top-clients':
+        data = await apiCall(url, cookie, '/control/stats');
+        const clients = {};
+        for (const item of data.top_clients) {
+          const [ip, count] = Object.entries(item)[0];
+          clients[ip] = count;
+        }
+        console.log(`💻 Top Clients (${instanceName})`);
+        Object.entries(clients).slice(0, 10).forEach(([ip, count], i) => {
+          console.log(`${i + 1}. ${ip}: ${count.toLocaleString()} queries`);
+        });
+        break;
+        
+      case 'top-blocked':
+        data = await apiCall(url, cookie, '/control/stats');
+        const blocked = {};
+        for (const item of data.top_blocked_domains) {
+          const [domain, count] = Object.entries(item)[0];
+          blocked[domain] = count;
+        }
+        console.log(`🚫 Top Blocked Domains (${instanceName})`);
+        Object.entries(blocked).slice(0, 10).forEach(([domain, count], i) => {
+          console.log(`${i + 1}. ${domain}: ${count.toLocaleString()} blocks`);
+        });
+        break;
+        
+      case 'health':
+        try {
+          const healthCheck = await httpRequest(url, '/', 'GET');
+          console.log(`✅ Health Check (${instanceName}): HTTP ${healthCheck.statusCode}`);
+        } catch (e) {
+          console.error(`❌ Health Check (${instanceName}): Failed - ${e.message}`);
+        }
+        break;
+        
+      case 'status':
+        data = await apiCall(url, cookie, '/control/status');
+        console.log(`🔧 AdGuard Home Status (${instanceName})`);
+        console.log(`Version: ${data.version}`);
+        console.log(`Running: ${data.running ? '✅ Yes' : '❌ No'}`);
+        console.log(`Protection: ${data.protection_enabled ? '✅ Enabled' : '❌ Disabled'}`);
+        console.log(`DNS Port: ${data.dns_port}`);
+        console.log(`HTTP Port: ${data.http_port}`);
+        console.log(`Language: ${data.language}`);
+        console.log(`DHCP Available: ${data.dhcp_available ? '✅ Yes' : '❌ No'}`);
+        break;
+        
+      case 'dns-info':
+        data = await apiCall(url, cookie, '/control/dns_info');
+        console.log(`🌐 DNS Configuration (${instanceName})`);
+        console.log(`Protection: ${data.protection_enabled ? '✅ Enabled' : '❌ Disabled'}`);
+        console.log(`Rate Limit: ${data.ratelimit} req/s`);
+        console.log(`Upstream Mode: ${data.upstream_mode}`);
+        console.log(`Cache: ${data.cache_enabled ? `✅ ${(data.cache_size / 1024 / 1024).toFixed(0)}MB` : '❌ Disabled'}`);
+        console.log(`DNSSEC: ${data.dnssec_enabled ? '✅ Enabled' : '❌ Disabled'}`);
+        console.log(`IPv6: ${data.disable_ipv6 ? '❌ Disabled' : '✅ Enabled'}`);
+        console.log(`\nUpstream DNS Servers:`);
+        data.upstream_dns.forEach((dns, i) => {
+          console.log(`  ${i + 1}. ${dns}`);
+        });
+        break;
+        
+      case 'filter-rules':
+        data = await apiCall(url, cookie, '/control/filtering/status');
+        console.log(`🛡️ Filter Rules (${instanceName})`);
+        console.log(`Filtering: ${data.enabled ? '✅ Enabled' : '❌ Disabled'}`);
+        console.log(`Update Interval: ${data.interval} hours`);
+        console.log(`User Rules: ${data.user_rules ? data.user_rules.length : 0} custom rules`);
+        console.log(`\nFilter Lists:`);
+        if (data.filters && data.filters.length > 0) {
+          data.filters.forEach((filter, i) => {
+            const status = filter.enabled ? '✅' : '❌';
+            console.log(`  ${i + 1}. ${status} ${filter.name} (${filter.rules_count} rules)`);
+          });
+        } else {
+          console.log('  No filter lists configured');
+        }
+        break;
+        
+      case 'querylog':
+        // Security: Validate limit parameter
+        const limit = validateInt(args[2], 1, 100, 10);
+        data = await apiCall(url, cookie, `/control/querylog?limit=${limit}&response_status="all"`);
+        console.log(`📜 Recent DNS Queries (${instanceName}) - Last ${limit} entries\n`);
+        if (data.data && data.data.length > 0) {
+          data.data.forEach((entry, i) => {
+            const status = entry.reason?.includes('Filtered') ? '🚫 BLOCKED' : '✅ OK';
+            const domain = entry.question?.name || 'unknown';
+            const client = entry.client || 'unknown';
+            const time = new Date(entry.time).toLocaleTimeString();
+            console.log(`${i + 1}. [${time}] ${status} ${domain} (${client})`);
+            if (entry.rule) {
+              console.log(`   Rule: ${entry.rule}`);
+            }
+          });
+        } else {
+          console.log('No query log entries found');
+        }
+        break;
+        
+      case 'clients':
+        data = await apiCall(url, cookie, '/control/clients');
+        console.log(`👥 Clients (${instanceName})`);
+        if (data.clients && data.clients.length > 0) {
+          data.clients.forEach((client, i) => {
+            console.log(`${i + 1}. ${client.name || client.ids?.[0] || 'Unknown'}`);
+            if (client.use_global_settings === false) {
+              console.log(`   Custom settings enabled`);
+            }
+            if (client.blocking_mode) {
+              console.log(`   Blocking mode: ${client.blocking_mode}`);
+            }
+          });
+        } else {
+          console.log('No manually configured clients');
+        }
+        console.log(`\nAuto-discovered clients: ${data.auto_clients?.length || 0}`);
+        break;
+        
+      case 'tls-status':
+        data = await apiCall(url, cookie, '/control/tls/status');
+        console.log(`🔒 TLS/Encryption Status (${instanceName})`);
+        console.log(`TLS Enabled: ${data.enabled ? '✅ Yes' : '❌ No'}`);
+        console.log(`Force HTTPS: ${data.force_https ? '✅ Yes' : '❌ No'}`);
+        console.log(`Valid Certificate: ${data.valid_cert ? '✅ Yes' : '❌ No'}`);
+        console.log(`HTTPS Port: ${data.port_https}`);
+        console.log(`DoT Port: ${data.port_dns_over_tls}`);
+        console.log(`DoQ Port: ${data.port_dns_over_quic}`);
+        console.log(`Allow Unencrypted DoH: ${data.allow_unencrypted_doh ? '✅ Yes' : '❌ No'}`);
+        break;
+        
+      default:
+        // Should not reach here due to validateCommand
+        console.error('❌ Unknown command');
+        process.exit(1);
+    }
+  } catch (e) {
+    console.error('❌ Error:', e.message);
+    process.exit(1);
   }
 }
+
+main();

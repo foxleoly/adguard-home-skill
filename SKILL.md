@@ -231,6 +231,22 @@ A: 确保 AdGuard Home 设置中已启用查询日志（设置 → DNS 设置 �
 
 ## Version History | 版本历史
 
+### v1.2.0 (2026-02-24) - Security Hardening 🔒
+
+**Security Improvements | 安全改进：**
+- ✅ **Removed command injection vulnerability** - Replaced `execSync` + `curl` with native HTTPS client
+- ✅ **Input validation** - Sanitized instance names, commands, and parameters
+- ✅ **Command whitelist** - Only allowed commands can be executed
+- ✅ **URL validation** - Verified URL format before making requests
+- ✅ **Parameter bounds** - Limited querylog limit to 1-100 entries
+- ✅ **No shell escaping issues** - Pure JavaScript HTTP requests
+
+**Technical Changes | 技术变更：**
+- Removed dependency on `child_process` and external `curl` commands
+- Implemented native `http`/`https` module for all API calls
+- Added cookie-based session management
+- Improved error handling and validation
+
 ### v1.1.0 (2026-02-24) - Enhanced
 
 **New Commands | 新增命令：**
