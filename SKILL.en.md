@@ -226,6 +226,13 @@ A: Ensure query log is enabled in AdGuard Home settings (Settings → DNS Settin
 
 ## Version History
 
+### v1.2.5 (2026-02-25) - Fix Registry Metadata 🔧
+
+**Bug Fixes:**
+- ✅ **Fixed registry metadata** - `clawhub.json` now correctly declares `requires.env` with `ADGUARD_URL`, `ADGUARD_USERNAME`, `ADGUARD_PASSWORD`
+- ✅ **Set primaryEnv** - ClawHub store now shows environment variables as required
+- ✅ **Updated security notes** - Documents metadata fix
+
 ### v1.2.2 (2026-02-25) - Remove File-based Credentials 🔐
 
 **Security Improvements:**

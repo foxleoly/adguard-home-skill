@@ -248,6 +248,13 @@ A: 确保 AdGuard Home 设置中已启用查询日志（设置 → DNS 设置 �
 
 ## Version History | 版本历史
 
+### v1.2.5 (2026-02-25) - Fix Registry Metadata 🔧
+
+**Bug Fixes | 修复：**
+- ✅ **Fixed registry metadata** - `clawhub.json` 现在正确声明 `requires.env` 包含 `ADGUARD_URL`、`ADGUARD_USERNAME`、`ADGUARD_PASSWORD`
+- ✅ **Set primaryEnv** - ClawHub 商店现在显示环境变量为必需
+- ✅ **Updated security notes** - 文档化元数据修复
+
 ### v1.2.2 (2026-02-25) - Remove File-based Credentials 🔐
 
 **Security Improvements | 安全改进：**
