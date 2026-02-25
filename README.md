@@ -33,7 +33,27 @@ cp -r skills/adguard-home ~/.openclaw/workspace/skills/
 
 ## Configuration
 
-Create `~/.openclaw/workspace/adguard-instances.json`:
+### 🔒 Security Best Practices
+
+**⚠️ Important:** Do not store plaintext credentials in configuration files. Use environment variables or a secrets manager.
+
+#### Option 1: Environment Variables (Recommended)
+
+```bash
+export ADGUARD_URL="http://192.168.145.249:1080"
+export ADGUARD_USERNAME="admin"
+export ADGUARD_PASSWORD="your-secure-password"
+```
+
+#### Option 2: 1Password CLI
+
+```bash
+export ADGUARD_PASSWORD=$(op read "op://vault/AdGuard/credential")
+```
+
+#### Option 3: Workspace Config (Local Development Only)
+
+For local development, create `adguard-instances.json` in the skill directory:
 
 ```json
 {
@@ -41,16 +61,13 @@ Create `~/.openclaw/workspace/adguard-instances.json`:
     "dns1": {
       "url": "http://192.168.145.249:1080",
       "username": "admin",
-      "password": "your-password"
-    },
-    "dns2": {
-      "url": "http://192.168.145.96:3000",
-      "username": "admin",
-      "password": "your-password"
+      "password": "your-secure-password"
     }
   }
 }
 ```
+
+**⚠️ Never commit this file to version control. Add it to `.gitignore`.**
 
 ## Usage
 
@@ -95,9 +112,7 @@ Create `~/.openclaw/workspace/adguard-instances.json`:
 
 ## Version
 
-**v1.2.0** - 🔒 Security Hardening (Fixed command injection, native HTTP client, input validation)
-
-**v1.1.1** - Support default and custom workspace paths
+**v1.2.1** - Security hardening: environment variables, no multi-path search, secure credential handling
 
 ## Author
 
