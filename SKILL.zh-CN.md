@@ -233,8 +233,8 @@ A: 检查配置文件中的用户名密码是否正确，确认 AdGuard Home 服
 **Q: How to add more instances?**  
 **Q: 如何添加更多实例？**
 
-A: Add new key-value pairs to the `instances` object in `adguard-instances.json`.  
-A: 在 `adguard-instances.json` 的 `instances` 对象中添加新的键值对即可。
+A: Use a secrets manager (1Password) to store multiple instance credentials, or switch between instances by setting different `ADGUARD_URL` values. For advanced multi-instance setups, consider running separate shell sessions with different environment configurations.  
+A: 使用 1Password 等密钥管理器存储多个实例的凭证，或通过设置不同的 `ADGUARD_URL` 切换实例。对于高级多实例场景，可以在不同的 Shell 会话中配置不同的环境变量。
 
 ---
 
@@ -247,6 +247,16 @@ A: 确保 AdGuard Home 设置中已启用查询日志（设置 → DNS 设置 �
 ---
 
 ## Version History | 版本历史
+
+### v1.2.6 (2026-02-25) - Remove File Config References 🔧
+
+**Bug Fixes | 修复：**
+- ✅ **Fixed FAQ inconsistency** - Removed `adguard-instances.json` reference from "How to add more instances?" answer
+- ✅ **Docs match code** - All documentation now consistent with v1.2.2+ env-vars-only implementation
+- ✅ **Updated multi-instance guidance** - Explains using 1Password or separate shell sessions
+- ✅ **FAQ 不一致修复** - 移除 "如何添加更多实例" 答案中的 `adguard-instances.json` 引用
+- ✅ **文档与代码一致** - 所有文档现在与 v1.2.2+ 的纯环境变量实现一致
+- ✅ **多实例指导更新** - 说明使用 1Password 或独立 Shell 会话
 
 ### v1.2.5 (2026-02-25) - Fix Registry Metadata 🔧
 

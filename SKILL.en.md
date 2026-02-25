@@ -214,7 +214,7 @@ A: Verify username/password. Ensure AdGuard Home service is running.
 
 **Q: How to add more instances?**
 
-A: Set additional environment variables with different instance configurations.
+A: Use a secrets manager (1Password) to store multiple instance credentials, or switch between instances by setting different `ADGUARD_URL` values. For advanced multi-instance setups, consider running separate shell sessions with different environment configurations.
 
 ---
 
@@ -225,6 +225,13 @@ A: Ensure query log is enabled in AdGuard Home settings (Settings → DNS Settin
 ---
 
 ## Version History
+
+### v1.2.6 (2026-02-25) - Remove File Config References 🔧
+
+**Bug Fixes:**
+- ✅ **Fixed FAQ inconsistency** - Removed `adguard-instances.json` reference from "How to add more instances?" answer
+- ✅ **Docs match code** - All documentation now consistent with v1.2.2+ env-vars-only implementation
+- ✅ **Updated multi-instance guidance** - Explains using 1Password or separate shell sessions
 
 ### v1.2.5 (2026-02-25) - Fix Registry Metadata 🔧
 
