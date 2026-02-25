@@ -137,6 +137,9 @@ Filter Lists:
 **⚠️ Important:** Never store plaintext credentials in files. Always use secure credential injection:  
 **⚠️ 重要：** 切勿在文件中存储明文凭证。请始终使用安全的凭证注入方式：
 
+**Recommended | 推荐:** Create a **read-only or limited-permission account** in AdGuard Home for this skill. Only grant the permissions needed for query/statistics operations.  
+**建议:** 在 AdGuard Home 中为此技能创建**只读或有限权限账户**。只授予查询/统计操作所需的权限。
+
 #### Option 1: Environment Variables (Recommended) | 方案一：环境变量（推荐）
 
 Set environment variables before running commands:  

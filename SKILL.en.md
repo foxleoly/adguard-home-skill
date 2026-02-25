@@ -135,6 +135,8 @@ Filter Lists:
 
 **⚠️ Important:** Never store plaintext credentials in files. Always use secure credential injection:
 
+**Recommended:** Create a **read-only or limited-permission account** in AdGuard Home for this skill. Only grant the permissions needed for query/statistics operations.
+
 #### Option 1: Environment Variables (Recommended)
 
 Set environment variables before running commands:
