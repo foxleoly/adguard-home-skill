@@ -251,6 +251,16 @@ A: 确保 AdGuard Home 设置中已启用查询日志（设置 → DNS 设置 �
 
 ## Version History | 版本历史
 
+### v1.2.7 (2026-02-25) - Security Verification + Read-Only Guidance 🔐
+
+**Security Improvements | 安全改进：**
+- ✅ **Added read-only account recommendation** - Docs now explicitly recommend using limited-permission AdGuard accounts
+- ✅ **SECURITY_VERIFICATION.md** - Comprehensive responses to all 8 independent security review points
+- ✅ **Verification guide** - Documents code inspection, metadata fixes, unicode checks, and isolation testing
+- ✅ **添加只读账户建议** - 文档现在明确建议使用有限权限的 AdGuard 账户
+- ✅ **SECURITY_VERIFICATION.md** - 全面回应所有 8 个独立安全审查要点
+- ✅ **验证指南** - 记录代码检查、元数据修复、unicode 检查和隔离测试
+
 ### v1.2.6 (2026-02-25) - Remove File Config References 🔧
 
 **Bug Fixes | 修复：**

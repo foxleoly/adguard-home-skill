@@ -228,6 +228,13 @@ A: Ensure query log is enabled in AdGuard Home settings (Settings → DNS Settin
 
 ## Version History
 
+### v1.2.7 (2026-02-25) - Security Verification + Read-Only Guidance 🔐
+
+**Security Improvements:**
+- ✅ **Added read-only account recommendation** - Docs now explicitly recommend using limited-permission AdGuard accounts
+- ✅ **SECURITY_VERIFICATION.md** - Comprehensive responses to all 8 independent security review points
+- ✅ **Verification guide** - Documents code inspection, metadata fixes, unicode checks, and isolation testing
+
 ### v1.2.6 (2026-02-25) - Remove File Config References 🔧
 
 **Bug Fixes:**
