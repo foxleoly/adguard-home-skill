@@ -188,30 +188,52 @@ Filter Lists:
 
 ## Configuration | 配置说明
 
-Configure instances in `adguard-instances.json`. The skill searches in this order:  
-配置文件 `adguard-instances.json` 的搜索顺序：
+### 🔒 Security Best Practices | 安全最佳实践
 
-1. `$OPENCLAW_WORKSPACE/adguard-instances.json` (if env var set | 如果设置了环境变量)
-2. `~/.openclaw/workspace/adguard-instances.json` (default | 默认)
-3. `~/.openclaw-*/workspace/adguard-instances.json` (custom workspace | 自定义工作区)
+**⚠️ Important:** Do not store plaintext credentials in configuration files. Use one of these secure methods:  
+**⚠️ 重要：** 不要在配置文件中存储明文凭证。请使用以下安全方式之一：
 
-Example configuration | 配置示例：
+#### Option 1: Environment Variables (Recommended) | 方案一：环境变量（推荐）
+
+Set environment variables before running commands:  
+运行命令前设置环境变量：
+
+```bash
+export ADGUARD_URL="http://192.168.145.249:1080"
+export ADGUARD_USERNAME="admin"
+export ADGUARD_PASSWORD="your-secure-password"
+```
+
+#### Option 2: 1Password CLI | 方案二：1Password CLI
+
+Use `op read` to inject secrets at runtime:  
+使用 `op read` 在运行时注入密钥：
+
+```bash
+export ADGUARD_PASSWORD=$(op read "op://vault/AdGuard/credential")
+```
+
+#### Option 3: Workspace Config (Local Development Only) | 方案三：工作区配置（仅本地开发）
+
+For local development, create `adguard-instances.json` in your **current workspace root only**:  
+本地开发时，仅在**当前工作区根目录**创建 `adguard-instances.json`：
+
 ```json
 {
   "instances": {
     "dns1": {
       "url": "http://192.168.145.249:1080",
       "username": "admin",
-      "password": "admin"
-    },
-    "dns2": {
-      "url": "http://192.168.145.96:3000",
-      "username": "admin",
-      "password": "admin"
+      "password": "your-secure-password"
     }
   }
 }
 ```
+
+**⚠️ Never commit this file to version control. Add it to `.gitignore`.**  
+**⚠️ 切勿将此文件提交到版本控制。将其添加到 `.gitignore`。**
+
+---
 
 ### Configuration Parameters | 配置参数
 
@@ -219,13 +241,13 @@ Example configuration | 配置示例：
 |-----------|-------------|---------|
 | `url` | AdGuard Home URL (with port) | `http://192.168.145.249:1080` |
 | `username` | Admin username | `admin` |
-| `password` | Admin password | `admin` |
+| `password` | Admin password (use env var or secrets manager) | `your-secure-password` |
 
 | 参数 | 说明 | 示例 |
 |------|------|------|
 | `url` | AdGuard Home 访问地址（含端口） | `http://192.168.145.249:1080` |
 | `username` | 管理员用户名 | `admin` |
-| `password` | 管理员密码 | `admin` |
+| `password` | 管理员密码（建议使用环境变量或密钥管理） | `your-secure-password` |
 
 ---
 
@@ -253,11 +275,8 @@ Example configuration | 配置示例：
 **Q: Error "No AdGuard instances configured"?**  
 **Q: 提示 "No AdGuard instances configured"？**
 
-A: The skill searches for config in multiple locations. Check these paths in order:  
-A: Skill 会在多个位置查找配置文件，按顺序检查：
-   1. `$OPENCLAW_WORKSPACE/adguard-instances.json`
-   2. `~/.openclaw/workspace/adguard-instances.json`
-   3. `~/.openclaw-*/workspace/adguard-instances.json`
+A: Ensure environment variables are set (`ADGUARD_URL`, `ADGUARD_USERNAME`, `ADGUARD_PASSWORD`) or create `adguard-instances.json` in your current workspace root.  
+A: 请确保已设置环境变量（`ADGUARD_URL`、`ADGUARD_USERNAME`、`ADGUARD_PASSWORD`），或在当前工作区根目录创建 `adguard-instances.json`。
 
 ---
 
@@ -286,6 +305,16 @@ A: 确保 AdGuard Home 设置中已启用查询日志（设置 → DNS 设置 �
 ---
 
 ## Version History | 版本历史
+
+### v1.2.1 (2026-02-25) - Credential Security 🔐
+
+**Security Improvements | 安全改进：**
+- ✅ **Removed plaintext credential storage** - No longer instructs creating config files with admin credentials
+- ✅ **Environment variable support** - Secure credential injection via `ADGUARD_URL`, `ADGUARD_USERNAME`, `ADGUARD_PASSWORD`
+- ✅ **1Password integration** - Supports secrets management via `op read`
+- ✅ **Removed multi-path search** - No longer searches `~/.openclaw-*/workspace/` paths
+- ✅ **Workspace-only config** - Local config file only checked in skill directory (dev use)
+- ✅ **Updated documentation** - Security best practices prominently featured
 
 ### v1.2.0 (2026-02-24) - Security Hardening 🔒
 
